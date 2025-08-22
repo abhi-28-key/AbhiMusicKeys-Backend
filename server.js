@@ -34,6 +34,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'AbhiMusicKeys Backend is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Email configuration
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -160,8 +170,10 @@ app.post('/api/request-password-reset', async (req, res) => {
 const keyId = process.env.RAZORPAY_KEY_ID;
 const keySecret = process.env.RAZORPAY_KEY_SECRET;
 
-console.log('Razorpay Key ID:', keyId);
-console.log('Razorpay Key Secret:', keySecret ? '***SET***' : '***NOT SET***');
+console.log('🔐 Razorpay Configuration:');
+console.log('Key ID:', keyId);
+console.log('Key Secret:', keySecret ? '***SET***' : '***NOT SET***');
+console.log('Environment:', keyId?.includes('rzp_live_') ? 'LIVE' : 'TEST');
 
 // Validate keys
 if (!keyId || !keySecret) {
@@ -186,6 +198,13 @@ if (keyId && keySecret) {
     key_id: formattedKeyId,
     key_secret: keySecret,
   });
+  
+  // Log environment status
+  if (formattedKeyId?.includes('rzp_live_')) {
+    console.log('🚀 LIVE MODE: Real payments will be processed');
+  } else {
+    console.log('🧪 TEST MODE: Only test payments will be processed');
+  }
 }
 
 // Create order endpoint
@@ -198,23 +217,46 @@ app.post('/api/create-order', async (req, res) => {
       });
     }
 
-    const { amount, currency = 'INR', planId } = req.body;
+    const { amount, currency = 'INR', planId, userId, userEmail } = req.body;
     
+    // Validate amount
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid amount provided'
+      });
+    }
+
     const options = {
-      amount: amount * 100, // Razorpay expects amount in paise
+      amount: Math.round(amount * 100), // Razorpay expects amount in paise
       currency,
-      receipt: `order_${Date.now()}`,
+      receipt: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       notes: {
         planId: planId,
-        userId: req.body.userId || 'anonymous'
+        userId: userId || 'anonymous',
+        userEmail: userEmail || 'unknown',
+        environment: keyId?.includes('rzp_live_') ? 'live' : 'test'
       }
     };
 
+    console.log('Creating order with options:', {
+      ...options,
+      notes: options.notes
+    });
+
     const order = await razorpay.orders.create(options);
+    
+    console.log('Order created successfully:', {
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      environment: keyId?.includes('rzp_live_') ? 'LIVE' : 'TEST'
+    });
     
     res.json({
       success: true,
-      order: order
+      order: order,
+      environment: keyId?.includes('rzp_live_') ? 'live' : 'test'
     });
   } catch (error) {
     console.error('Error creating order:', error);
@@ -225,6 +267,8 @@ app.post('/api/create-order', async (req, res) => {
       errorMessage = 'Razorpay authentication failed. Please check your API keys.';
     } else if (error.statusCode === 400) {
       errorMessage = 'Invalid request parameters.';
+    } else if (error.statusCode === 403) {
+      errorMessage = 'Access denied. Please check your Razorpay account status.';
     } else if (error.message) {
       errorMessage = error.message;
     }
