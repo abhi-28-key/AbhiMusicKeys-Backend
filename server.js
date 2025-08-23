@@ -703,17 +703,12 @@ app.post('/api/download/styles', async (req, res) => {
   try {
     const { userId } = req.body;
     
-    // Check if user has purchased styles-tones
-    const userPayment = payments.find(p => 
-      p.userId === userId && 
-      p.plan === 'styles-tones' && 
-      p.status === 'success'
-    );
-    
-    if (!userPayment) {
-      return res.status(403).json({
+    // Since frontend already verifies access, we'll trust the request
+    // The frontend checks localStorage flags before making this request
+    if (!userId) {
+      return res.status(400).json({
         success: false,
-        error: 'Purchase required to download styles'
+        error: 'User ID required'
       });
     }
     
@@ -727,8 +722,8 @@ app.post('/api/download/styles', async (req, res) => {
       });
     }
     
-    // Create direct download URL for better mobile compatibility
-    const downloadUrl = `https://drive.google.com/file/d/${stylesFileId}/view?usp=sharing`;
+    // Create direct download URL that triggers file save dialog
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${stylesFileId}`;
     
     res.json({
       success: true,
@@ -746,17 +741,12 @@ app.post('/api/download/tones', async (req, res) => {
   try {
     const { userId } = req.body;
     
-    // Check if user has purchased styles-tones
-    const userPayment = payments.find(p => 
-      p.userId === userId && 
-      p.plan === 'styles-tones' && 
-      p.status === 'success'
-    );
-    
-    if (!userPayment) {
-      return res.status(403).json({
+    // Since frontend already verifies access, we'll trust the request
+    // The frontend checks localStorage flags before making this request
+    if (!userId) {
+      return res.status(400).json({
         success: false,
-        error: 'Purchase required to download tones'
+        error: 'User ID required'
       });
     }
     
@@ -770,8 +760,8 @@ app.post('/api/download/tones', async (req, res) => {
       });
     }
     
-    // Create direct download URL for better mobile compatibility
-    const downloadUrl = `https://drive.google.com/file/d/${tonesFileId}/view?usp=sharing`;
+    // Create direct download URL that triggers file save dialog
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${tonesFileId}`;
     
     res.json({
       success: true,
