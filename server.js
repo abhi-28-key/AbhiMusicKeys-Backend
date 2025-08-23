@@ -703,21 +703,38 @@ app.post('/api/download/styles', async (req, res) => {
   try {
     const { userId } = req.body;
     
-    // Replace this with your actual Google Drive file ID for styles
-    const stylesFileId = '1VQDV9perCZFtBZXfUjqhuAzleeU6cKYR';
+    // Check if user has purchased styles-tones
+    const userPayment = payments.find(p => 
+      p.userId === userId && 
+      p.plan === 'styles-tones' && 
+      p.status === 'success'
+    );
     
-    if (!stylesFileId) {
-      return res.status(500).json({ 
-        error: 'Styles file ID not configured'
+    if (!userPayment) {
+      return res.status(403).json({
+        success: false,
+        error: 'Purchase required to download styles'
       });
     }
     
-    // Create Google Drive download URL
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${stylesFileId}`;
+    // Replace this with your actual Google Drive file ID for styles
+    const stylesFileId = process.env.GOOGLE_DRIVE_STYLES_FILE_ID || '1VQDV9perCZFtBZXfUjqhuAzleeU6cKYR';
+    
+    if (!stylesFileId) {
+      return res.status(500).json({
+        success: false,
+        error: 'Styles file not configured'
+      });
+    }
+    
+    // Create direct download URL for better mobile compatibility
+    const downloadUrl = `https://drive.google.com/file/d/${stylesFileId}/view?usp=sharing`;
     
     res.json({
+      success: true,
       downloadUrl: downloadUrl,
-      fileName: 'Indian_Styles_Package.zip'
+      fileName: 'Indian_Styles_Package.zip',
+      fileSize: 'Unknown'
     });
   } catch (error) {
     console.error('Download styles error:', error);
@@ -729,21 +746,38 @@ app.post('/api/download/tones', async (req, res) => {
   try {
     const { userId } = req.body;
     
-    // Replace this with your actual Google Drive file ID for tones
-    const tonesFileId = '1sLhbzIcBxHl8gVkpyLd_y6T42qb8azJ9';
+    // Check if user has purchased styles-tones
+    const userPayment = payments.find(p => 
+      p.userId === userId && 
+      p.plan === 'styles-tones' && 
+      p.status === 'success'
+    );
     
-    if (!tonesFileId) {
-      return res.status(500).json({ 
-        error: 'Tones file ID not configured'
+    if (!userPayment) {
+      return res.status(403).json({
+        success: false,
+        error: 'Purchase required to download tones'
       });
     }
     
-    // Create Google Drive download URL
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${tonesFileId}`;
+    // Replace this with your actual Google Drive file ID for tones
+    const tonesFileId = process.env.GOOGLE_DRIVE_TONES_FILE_ID || '1sLhbzIcBxHl8gVkpyLd_y6T42qb8azJ9';
+    
+    if (!tonesFileId) {
+      return res.status(500).json({
+        success: false,
+        error: 'Tones file not configured'
+      });
+    }
+    
+    // Create direct download URL for better mobile compatibility
+    const downloadUrl = `https://drive.google.com/file/d/${tonesFileId}/view?usp=sharing`;
     
     res.json({
+      success: true,
       downloadUrl: downloadUrl,
-      fileName: 'Indian_Tones_Package.zip'
+      fileName: 'Indian_Tones_Package.zip',
+      fileSize: 'Unknown'
     });
   } catch (error) {
     console.error('Download tones error:', error);
