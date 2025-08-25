@@ -25,7 +25,20 @@ try {
   console.error('Failed to initialize Firebase Admin:', e);
 }
 
-// In-memory storage for payments (temporary solution)
+// Initialize Firestore
+let db;
+try {
+  if (admin.apps.length) {
+    db = admin.firestore();
+    console.log('✅ Firestore initialized successfully');
+  } else {
+    console.warn('⚠️ Firestore not available: Firebase Admin not initialized');
+  }
+} catch (e) {
+  console.error('❌ Failed to initialize Firestore:', e);
+}
+
+// In-memory storage for payments (fallback)
 let payments = [];
 
 const app = express();
@@ -402,10 +415,22 @@ app.post('/api/verify-payment', async (req, res) => {
         failureReason: null
       };
       
-      // Store in memory
-      payments.push(paymentData);
-      
-      console.log('Payment stored in memory with ID:', paymentData.id);
+      // Store in Firestore if available, otherwise fallback to memory
+      if (db) {
+        try {
+          await db.collection('payments').add(paymentData);
+          console.log('✅ Payment stored in Firestore with ID:', paymentData.id);
+        } catch (firestoreError) {
+          console.error('❌ Failed to store payment in Firestore:', firestoreError);
+          // Fallback to memory storage
+          payments.push(paymentData);
+          console.log('📝 Payment stored in memory (fallback) with ID:', paymentData.id);
+        }
+      } else {
+        // Fallback to memory storage
+        payments.push(paymentData);
+        console.log('📝 Payment stored in memory with ID:', paymentData.id);
+      }
 
       // Fire-and-forget: send payment confirmation email
       try {
@@ -479,10 +504,22 @@ app.post('/api/verify-payment', async (req, res) => {
         failureReason: 'Invalid signature'
       };
       
-      // Store failure in memory
-      payments.push(failureData);
-      
-      console.log('Payment failure stored in memory with ID:', failureData.id);
+      // Store failure in Firestore if available, otherwise fallback to memory
+      if (db) {
+        try {
+          await db.collection('payments').add(failureData);
+          console.log('✅ Payment failure stored in Firestore with ID:', failureData.id);
+        } catch (firestoreError) {
+          console.error('❌ Failed to store payment failure in Firestore:', firestoreError);
+          // Fallback to memory storage
+          payments.push(failureData);
+          console.log('📝 Payment failure stored in memory (fallback) with ID:', failureData.id);
+        }
+      } else {
+        // Fallback to memory storage
+        payments.push(failureData);
+        console.log('📝 Payment failure stored in memory with ID:', failureData.id);
+      }
       
       res.status(400).json({
         success: false,
@@ -514,8 +551,22 @@ app.post('/api/verify-payment', async (req, res) => {
          failureReason: error.message || 'Payment verification failed'
        };
       
-      payments.push(errorData);
-      console.log('Payment error stored in memory with ID:', errorData.id);
+      // Store error in Firestore if available, otherwise fallback to memory
+      if (db) {
+        try {
+          await db.collection('payments').add(errorData);
+          console.log('✅ Payment error stored in Firestore with ID:', errorData.id);
+        } catch (firestoreError) {
+          console.error('❌ Failed to store payment error in Firestore:', firestoreError);
+          // Fallback to memory storage
+          payments.push(errorData);
+          console.log('📝 Payment error stored in memory (fallback) with ID:', errorData.id);
+        }
+      } else {
+        // Fallback to memory storage
+        payments.push(errorData);
+        console.log('📝 Payment error stored in memory with ID:', errorData.id);
+      }
     } catch (memoryError) {
       console.error('Failed to store payment error in memory:', memoryError);
     }
@@ -533,9 +584,26 @@ app.get('/api/payments', async (req, res) => {
     const { timeFilter = 'all', planFilter = 'all', limit = 50 } = req.query;
     
     console.log('Fetching payments with filters:', { timeFilter, planFilter, limit });
-    console.log('Total payments in memory:', payments.length);
     
-    let filteredPayments = [...payments];
+    let filteredPayments = [];
+    
+    // Try to fetch from Firestore first, fallback to memory
+    if (db) {
+      try {
+        const paymentsSnapshot = await db.collection('payments').get();
+        filteredPayments = paymentsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log('✅ Fetched payments from Firestore:', filteredPayments.length);
+      } catch (firestoreError) {
+        console.error('❌ Failed to fetch from Firestore, using memory fallback:', firestoreError);
+        filteredPayments = [...payments];
+      }
+    } else {
+      filteredPayments = [...payments];
+      console.log('📝 Using memory payments:', filteredPayments.length);
+    }
     
     // Apply time filter
     if (timeFilter === 'month') {
@@ -593,9 +661,26 @@ app.get('/api/payment-stats', async (req, res) => {
     const { timeFilter = 'all' } = req.query;
     
     console.log('Fetching payment stats with timeFilter:', timeFilter);
-    console.log('Total payments in memory:', payments.length);
     
-    let filteredPayments = [...payments];
+    let filteredPayments = [];
+    
+    // Try to fetch from Firestore first, fallback to memory
+    if (db) {
+      try {
+        const paymentsSnapshot = await db.collection('payments').get();
+        filteredPayments = paymentsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log('✅ Fetched payments from Firestore for stats:', filteredPayments.length);
+      } catch (firestoreError) {
+        console.error('❌ Failed to fetch from Firestore for stats, using memory fallback:', firestoreError);
+        filteredPayments = [...payments];
+      }
+    } else {
+      filteredPayments = [...payments];
+      console.log('📝 Using memory payments for stats:', filteredPayments.length);
+    }
     
     // Apply time filter
     if (timeFilter === 'month') {
@@ -674,7 +759,23 @@ app.get('/api/payment-stats', async (req, res) => {
 // Get receipt by ID
 app.get('/api/receipts/:id', async (req, res) => {
   try {
-    const payment = payments.find(p => p.id === req.params.id);
+    let payment = null;
+    
+    // Try to fetch from Firestore first, fallback to memory
+    if (db) {
+      try {
+        const paymentDoc = await db.collection('payments').doc(req.params.id).get();
+        if (paymentDoc.exists) {
+          payment = { id: paymentDoc.id, ...paymentDoc.data() };
+        }
+      } catch (firestoreError) {
+        console.error('❌ Failed to fetch receipt from Firestore:', firestoreError);
+        // Fallback to memory
+        payment = payments.find(p => p.id === req.params.id);
+      }
+    } else {
+      payment = payments.find(p => p.id === req.params.id);
+    }
     
     if (payment) {
       res.json({
