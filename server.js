@@ -723,13 +723,16 @@ app.post('/api/download/styles', async (req, res) => {
     }
     
     // Create direct download URL that triggers file save dialog
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${stylesFileId}`;
+    // Use a more mobile-friendly Google Drive URL format
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${stylesFileId}&confirm=t&uuid=`;
     
     res.json({
       success: true,
       downloadUrl: downloadUrl,
-      fileName: 'Indian_Styles_Package.zip',
-      fileSize: 'Unknown'
+      fileName: process.env.STYLES_FILE_NAME || 'Indian_Styles_Package.zip',
+      fileSize: 'Unknown',
+      // Add mobile-specific instructions
+      mobileInstructions: 'If download doesn\'t start automatically on mobile, please copy the link and open it in a new tab.'
     });
   } catch (error) {
     console.error('Download styles error:', error);
@@ -761,13 +764,16 @@ app.post('/api/download/tones', async (req, res) => {
     }
     
     // Create direct download URL that triggers file save dialog
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${tonesFileId}`;
+    // Use a more mobile-friendly Google Drive URL format
+    const downloadUrl = `https://drive.google.com/uc?export=download&id=${tonesFileId}&confirm=t&uuid=`;
     
     res.json({
       success: true,
       downloadUrl: downloadUrl,
-      fileName: 'Indian_Tones_Package.zip',
-      fileSize: 'Unknown'
+      fileName: process.env.TONES_FILE_NAME || 'Indian_Tones_Package.zip',
+      fileSize: 'Unknown',
+      // Add mobile-specific instructions
+      mobileInstructions: 'If download doesn\'t start automatically on mobile, please copy the link and open it in a new tab.'
     });
   } catch (error) {
     console.error('Download tones error:', error);
