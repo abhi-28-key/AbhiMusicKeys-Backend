@@ -241,7 +241,7 @@ app.post('/api/create-order', async (req, res) => {
     }
 
     const options = {
-      amount: Math.round(amount * 100), // Razorpay expects amount in paise
+      amount: Math.round(amount * 100), // Convert rupees to paise for Razorpay
       currency,
       receipt: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       notes: {
@@ -302,7 +302,7 @@ app.post('/api/mock-create-order', async (req, res) => {
     // Create a mock order
     const mockOrder = {
       id: `mock_order_${Date.now()}`,
-      amount: amount * 100,
+      amount: amount * 100, // Convert to paise for consistency
       currency: currency,
       receipt: `mock_receipt_${Date.now()}`,
       status: 'created',
